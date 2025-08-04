@@ -18,7 +18,7 @@ Aparecerá un campo para pegar configuración personalizada.
 Pega esta regla:
 
 ```bash
-<DirectoryMatch "^/home/.*/public_html/(wp-content|uploads|media|images)">
+<DirectoryMatch "^/home/.*/public_html/(uploads|media|images|docs)">
     <FilesMatch "\.php$">
         Require all denied
     </FilesMatch>
