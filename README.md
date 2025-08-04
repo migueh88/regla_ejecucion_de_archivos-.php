@@ -1,42 +1,111 @@
-✅ Solución correcta en WHM
-WHM te permite editar esos archivos de forma segura desde su interfaz, y creará automáticamente pre_virtualhost_global.conf si no existe.
+Perfecto, acá va la **guía paso a paso segura y compatible con WHM/cPanel** para implementar las reglas de protección sin romper nada:
 
-🧩 Pasos para hacerlo desde WHM:
-Entra a WHM como root.
+---
 
-En el buscador (arriba a la izquierda), escribe:
-👉 Apache Configuration
+## 🧱 PARTE 1 – Agregar regla Apache para **bloquear PHP en carpetas subidas**
 
-Haz clic en:
-👉 Include Editor
+### 🔐 Objetivo:
 
-En la sección Pre VirtualHost Include, selecciona:
-👉 All Versions
+Evitar que se ejecute cualquier archivo `.php` en rutas como `/wp-content/uploads`, `/media`, `/docs`, etc.
 
-Aparecerá un campo para pegar configuración personalizada.
+### ✅ Pasos en WHM:
 
-Pega esta regla:
+1. Iniciá sesión en **WHM como root**.
+2. En el buscador (arriba a la izquierda), escribí:
+   👉 **Apache Configuration**
+3. Hacé clic en:
+   👉 **Include Editor**
+4. En la sección **Pre VirtualHost Include**, seleccioná:
+   👉 **All Versions**
+5. En el cuadro de texto que aparece, pegá esta regla:
 
-```bash
+```apache
 <DirectoryMatch "^/home/.*/public_html/(uploads|media|images|docs)">
     <FilesMatch "\.php$">
         Require all denied
     </FilesMatch>
 </DirectoryMatch>
 ```
-Haz clic en Update o Save.
 
-Luego, WHM te pedirá reconstruir y reiniciar Apache. Acepta.
+6. Hacé clic en **Update**.
+7. WHM te pedirá **reconstruir y reiniciar Apache**. Aceptá.
 
-✅ Resultado:
-WHM va a crear automáticamente el archivo faltante:
-/etc/apache2/conf.d/includes/pre_virtualhost_global.conf
+---
 
-Y lo cargará correctamente sin romper configuraciones futuras ni sobrescribirse en actualizaciones.
+### 🧠 ¿Qué hace esto?
 
-🔒 Ventajas de hacerlo desde WHM:
-Compatible con las actualizaciones automáticas de cPanel.
+* Se aplica a **todos los dominios en el servidor**.
+* No afecta cPanel, ni WHM, ni sitios legítimos.
+* Protege contra ejecución de malware en carpetas donde normalmente no debería haber PHP.
 
-No se sobrescribe al recompilar Apache con EasyApache.
+---
 
-Más seguro que crear manualmente el archivo desde consola.
+## 🛡️ PARTE 2 – Agregar reglas ModSecurity para bloquear rutas y cargas comunes de phishing
+
+### ✅ Pasos:
+
+1. En WHM, buscá:
+   👉 **ModSecurity™ Vendors**
+2. Hacé clic en el vendor que estés usando (ej: OWASP, cPanel default).
+3. En la parte inferior, buscá **“Edit Custom Rules”** o similar.
+4. Pegá estas reglas:
+
+```apache
+# Bloqueo de rutas sospechosas
+SecRule REQUEST_URI "@rx ^/(auth|login|secure|verify|confirm|email\\.php|index2\\.php|_1\\.html)" \
+ "id:990001,phase:2,deny,status:403,log,msg:'Bloqueo de ruta común de phishing detectada'"
+
+# Bloqueo de cargas de archivos por multipart/form-data
+SecRule REQUEST_HEADERS:Content-Type "multipart/form-data" \
+ "id:990002,phase:2,t:none,deny,status:403,log,msg:'Bloqueo de intento de subida de archivo sospechoso'"
+
+# Bloqueo de parámetros peligrosos
+SecRule ARGS_NAMES "@rx ^(email|redirect|to)$" \
+ "id:990003,phase:2,deny,status:403,log,msg:'Bloqueo de parámetro sospechoso en formulario'"
+```
+
+5. Guardá los cambios.
+6. Reiniciá Apache si te lo solicita.
+
+---
+
+### 🧠 ¿Qué hacen estas reglas?
+
+* Bloquean rutas típicas de phishing aunque el dominio sea nuevo.
+* Previenen cargas de formularios con archivos maliciosos.
+* Detectan parámetros comunes usados en redirecciones maliciosas (`email=`, `to=`, etc.).
+
+---
+
+## 🔧 PARTE 3 (Opcional pero recomendado) – Bloquear `mail()` desde PHP
+
+### ✅ Cómo hacerlo por WHM o directamente en `php.ini`:
+
+1. En WHM, andá a:
+   👉 **Software > MultiPHP INI Editor**
+2. Seleccioná una versión de PHP usada en tu servidor.
+3. En **Editor de configuración básica**, bajá hasta encontrar:
+   👉 `disable_functions`
+4. Agregá (o asegurate de que estén) las siguientes funciones:
+
+```
+mail, exec, shell_exec, system, passthru, popen, proc_open
+```
+
+5. Guardá los cambios.
+
+📌 Alternativa: ponelo directamente en el `php.ini` global o por cuenta, si usás CloudLinux o configuración avanzada.
+
+---
+
+## ✅ Resultado final:
+
+Con estos tres pasos:
+
+* Cortás **la ejecución maliciosa**
+* Prevenís **subidas y acceso a rutas fraudulentas**
+* Evitás que scripts **envíen spam o phishing**
+
+---
+
+¿Querés que te arme un `.txt` con todo esto listo para guardar como checklist o documentación interna?
