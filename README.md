@@ -17,14 +17,13 @@ Aparecerá un campo para pegar configuración personalizada.
 
 Pega esta regla:
 
-apache
-Copiar
-Editar
+bash
 <DirectoryMatch "^/home/.*/public_html/(wp-content|uploads|media|images)">
     <FilesMatch "\.php$">
         Require all denied
     </FilesMatch>
 </DirectoryMatch>
+,,
 Haz clic en Update o Save.
 
 Luego, WHM te pedirá reconstruir y reiniciar Apache. Acepta.
