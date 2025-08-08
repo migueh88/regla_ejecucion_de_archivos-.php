@@ -51,21 +51,36 @@ Evitar que se ejecute cualquier archivo `.php` en rutas como `/wp-content/upload
 4. Pegá estas reglas:
 
 ```apache
-# Bloqueo de rutas sospechosas
-SecRule REQUEST_URI "@rx ^/(auth|login|secure|verify|confirm|email\\.php|index2\\.php|_1\\.html)" \
+# Habilitar inspección de cuerpo de peticiones POST / archivos subidos
+SecRequestBodyAccess On
+
+# Bloqueo de rutas sospechosas típicas de phishing
+SecRule REQUEST_URI "@rx ^/(auth|login|secure|verify|confirm|email\.php|index2\.php|_1\.html)" \
  "id:990001,phase:2,deny,status:403,log,msg:'Bloqueo de ruta común de phishing detectada'"
 
-# Bloqueo de cargas de archivos por multipart/form-data
+# Bloqueo de cargas de archivos por multipart/form-data (formulario con archivo)
 SecRule REQUEST_HEADERS:Content-Type "multipart/form-data" \
  "id:990002,phase:2,t:none,deny,status:403,log,msg:'Bloqueo de intento de subida de archivo sospechoso'"
 
-# Bloqueo de parámetros peligrosos
+# Bloqueo de parámetros peligrosos comunes en phishing y redirecciones
 SecRule ARGS_NAMES "@rx ^(email|redirect|to)$" \
  "id:990003,phase:2,deny,status:403,log,msg:'Bloqueo de parámetro sospechoso en formulario'"
 
-# Agregar regla ModSecurity para bloquear subida de archivos PHP
+# Bloqueo de parámetros peligrosos adicionales
+SecRule ARGS_NAMES "@rx ^(email|redirect|to|url|target)$" \
+ "id:990013,phase:2,deny,status:403,log,msg:'Parámetro sospechoso en URL o formulario'"
+
+# Bloqueo de subida de archivos PHP camuflados (.php, .phtml, etc.)
 SecRule FILES_NAMES "@rx \.(php|php3|php4|php5|phtml)$" \
-"id:990010,phase:2,t:none,deny,status:403,log,msg:'Subida de archivo PHP detectada'"
+ "id:990010,phase:2,t:none,deny,status:403,log,msg:'Subida de archivo PHP detectada'"
+
+# Bloqueo de acceso directo a archivos .php en URLs (por ejemplo /uploads/invoice.php)
+SecRule REQUEST_URI "@rx \.php(\?.*)?$" \
+ "id:990012,phase:2,t:none,deny,status:403,log,msg:'Acceso directo a archivo PHP bloqueado'"
+
+# Inspección del contenido del body (eval, base64_decode, shell_exec)
+SecRule REQUEST_BODY "@rx (eval\s*\(|base64_decode\s*\(|shell_exec\s*\()" \
+ "id:990011,phase:2,t:none,deny,status:403,log,msg:'Contenido sospechoso detectado en body o archivo subido'"
 ```
 
 5. Guardá los cambios.
