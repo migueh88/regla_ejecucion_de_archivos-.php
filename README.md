@@ -20,7 +20,7 @@ Evitar que se ejecute cualquier archivo `.php` en rutas como `/wp-content/upload
 5. En el cuadro de texto que aparece, pegá esta regla:
 
 ```apache
-<DirectoryMatch "^/home/.*/public_html/(uploads|media|images|docs)">
+<DirectoryMatch "^/home/.*/public_html/.*(uploads|media|images|docs)">
     <FilesMatch "\.php$">
         Require all denied
     </FilesMatch>
