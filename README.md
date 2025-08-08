@@ -62,6 +62,10 @@ SecRule REQUEST_HEADERS:Content-Type "multipart/form-data" \
 # Bloqueo de parámetros peligrosos
 SecRule ARGS_NAMES "@rx ^(email|redirect|to)$" \
  "id:990003,phase:2,deny,status:403,log,msg:'Bloqueo de parámetro sospechoso en formulario'"
+
+# Agregar regla ModSecurity para bloquear subida de archivos PHP
+SecRule FILES_NAMES "@rx \.(php|php3|php4|php5|phtml)$" \
+"id:990010,phase:2,t:none,deny,status:403,log,msg:'Subida de archivo PHP detectada'"
 ```
 
 5. Guardá los cambios.
