@@ -1,130 +1,123 @@
-Perfecto, acá va la **guía paso a paso segura y compatible con WHM/cPanel** para implementar las reglas de protección sin romper nada:
+genial — acá va el **Baseline WAF Hosting WP — v1.0 — 2025-08-11** listo para pegar.
+(Colócalo donde indico para que **no se pierda** con updates.)
 
----
+# Apache (global, persistente)
 
-## 🧱 PARTE 1 – Agregar regla Apache para **bloquear PHP en carpetas subidas**
-
-### 🔐 Objetivo:
-
-Evitar que se ejecute cualquier archivo `.php` en rutas como `/wp-content/uploads`, `/media`, `/docs`, etc.
-
-### ✅ Pasos en WHM:
-
-1. Iniciá sesión en **WHM como root**.
-2. En el buscador (arriba a la izquierda), escribí:
-   👉 **Apache Configuration**
-3. Hacé clic en:
-   👉 **Include Editor**
-4. En la sección **Pre VirtualHost Include**, seleccioná:
-   👉 **All Versions**
-5. En el cuadro de texto que aparece, pegá esta regla:
+WHM → Service Configuration → Apache Configuration → **Include Editor** → **Pre VirtualHost Include** → **All Versions**.
 
 ```apache
-<DirectoryMatch "^/home/.*/public_html/.*/(uploads|media|images|docs|files|assets)">
-    <FilesMatch "\.php$">
-        Require all denied
-    </FilesMatch>
+# === BASELINE: BLOQUEAR EJECUCIÓN DE PHP EN CARPETAS DE SUBIDAS ===
+# Seguro y universal (especialmente WordPress).
+<DirectoryMatch "^/home[0-9]*/[^/]+/public_html(?:/[^/]+)?/(?:wp-content/uploads|uploads|media|images|docs|files|assets)(?:/.*)?$">
+  <FilesMatch "\.ph(p[0-9]?|tml|ps|ar)$">
+    Require all denied
+  </FilesMatch>
 </DirectoryMatch>
+
+# Permitir validaciones (ACME/SSL) incluso si ModSecurity bloquea dotfiles.
+<LocationMatch "^/\.well-known/">
+  Require all granted
+</LocationMatch>
+
+# (OPCIONAL) Si la mayoría NO usa XML-RPC, puedes negar aquí:
+# <LocationMatch "^/xmlrpc\.php$">
+#   Require all denied
+# </LocationMatch>
 ```
 
-6. Hacé clic en **Update**.
-7. WHM te pedirá **reconstruir y reiniciar Apache**. Aceptá.
-
 ---
 
-### 🧠 ¿Qué hace esto?
+# ModSecurity (global, persistente)
 
-* Se aplica a **todos los dominios en el servidor**.
-* No afecta cPanel, ni WHM, ni sitios legítimos.
-* Protege contra ejecución de malware en carpetas donde normalmente no debería haber PHP.
-
----
-
-## 🛡️ PARTE 2 – Agregar reglas ModSecurity para bloquear rutas y cargas comunes de phishing
-
-### ✅ Pasos:
-
-1. En WHM, buscá:
-   👉 **ModSecurity™ Vendors**
-2. Hacé clic en el vendor que estés usando (ej: OWASP, cPanel default).
-3. En la parte inferior, buscá **“Edit Custom Rules”** o similar.
-4. Pegá estas reglas:
+WHM → Security Center → **ModSecurity™ Vendors** → **Edit Custom Rules** (o tu **Custom Vendor**).
 
 ```apache
-# Habilitar inspección de cuerpo de peticiones POST / archivos subidos
-SecRequestBodyAccess On
+# ===================================================================
+# BASELINE MODSECURITY — v1.0 (IDs 9000xx)
+# ===================================================================
 
-# Bloqueo de rutas sospechosas típicas de phishing
-SecRule REQUEST_URI "@rx ^/(auth|login|secure|verify|confirm|email\.php|index2\.php|_1\.html)" \
-"id:990001,phase:2,deny,status:403,log,msg:'Bloqueo de ruta común de phishing detectada'"
+# 900010 — subida de PHP camuflado
+SecRule FILES_NAMES "@rx \.(?:ph(?:p[0-9]?|tml|ps|ar)|phps)$" \
+ "id:900010,phase:2,deny,status:403,log,msg:'Upload de archivo PHP detectado (baseline)'"
 
-# Bloqueo de cargas de archivos por multipart/form-data (formulario con archivo)
-SecRule REQUEST_HEADERS:Content-Type "multipart/form-data" \
-"id:990002,phase:2,t:none,deny,status:403,log,msg:'Bloqueo de intento de subida de archivo sospechoso'"
+# 900012 — ejecución de PHP en /uploads/* (doble capa con Apache)
+SecRule REQUEST_URI "@rx ^/.*/(?:wp-content/uploads|uploads|media|images|docs|files|assets)/.*\.ph(p[0-9]?|tml|ps|ar)$" \
+ "id:900012,phase:2,deny,status:403,log,msg:'PHP en carpeta de subidas bloqueado (baseline)'"
 
-# Bloqueo de parámetros peligrosos comunes en phishing y redirecciones
-SecRule ARGS_NAMES "@rx ^(email|redirect|to)$" \
-"id:990003,phase:2,deny,status:403,log,msg:'Bloqueo de parámetro sospechoso en formulario'"
+# 900020 — dotfiles (permitiendo .well-known/)
+SecRule REQUEST_URI "@rx (^|/)\.[^/]" \
+ "id:900020,phase:1,deny,status:403,log,msg:'Hidden dotfile access blocked (baseline)'"
+<LocationMatch "^/\.well-known/">
+  SecRuleRemoveById 900020
+</LocationMatch>
 
-# Bloqueo de parámetros adicionales usados en phishing
-SecRule ARGS_NAMES "@rx ^(email|redirect|to|url|target)$" \
-"id:990013,phase:2,deny,status:403,log,msg:'Parámetro sospechoso en URL o formulario'"
+# 900101 — endpoints típicos de kits de phishing (de tus incidentes)
+SecRule REQUEST_URI "@pm index2.php email.php chameleon2.html mygov-login.html /mygv/ /o/ /_1.html /0" \
+ "id:900101,phase:2,deny,status:403,log,msg:'Patrón común de phishing (baseline)'"
 
-# Bloqueo de subida de archivos PHP camuflados (.php, .phtml, etc.)
-SecRule FILES_NAMES "@rx \.(php|php3|php4|php5|phtml)$" \
-"id:990010,phase:2,t:none,deny,status:403,log,msg:'Subida de archivo PHP detectada'"
+# 900102 — QS sospechosos (solo LOG; luego puedes pasar a deny si no hay FP)
+SecRule REQUEST_URI "@rx (?:\?|&)(?:email=|redirect=|to=|url=)" \
+ "id:900102,phase:2,pass,log,msg:'QS sospechoso visto en incidentes (solo log)'"
 
-# Bloqueo de acceso directo a archivos .php en URLs (por ejemplo /uploads/invoice.php)
-SecRule REQUEST_URI "@rx \.php(\?.*)?$" \
-"id:990012,phase:2,t:none,deny,status:403,log,msg:'Acceso directo a archivo PHP bloqueado'"
+# 900103 — crawler agresivo Bytespider
+SecRule REQUEST_HEADERS:User-Agent "@contains Bytespider" \
+ "id:900103,phase:1,deny,status:403,log,msg:'Bytespider crawler bloqueado (baseline)'"
 
-# Inspección del contenido del body (eval, base64_decode, shell_exec)
-SecRule REQUEST_BODY "@rx (eval\s*\(|base64_decode\s*\(|shell_exec\s*\()" \
-"id:990011,phase:2,t:none,deny,status:403,log,msg:'Contenido sospechoso detectado en body o archivo subido'"
+# 900104 — WP: admin-ajax con payloads maliciosos obvios
+SecRule REQUEST_URI "@contains /wp-admin/admin-ajax.php" \
+ "id:900104,phase:2,deny,status:403,log,msg:'admin-ajax payload sospechoso (WP)'" \
+  chain
+SecRule ARGS "@rx (?:base64_decode|eval\s*\(|shell_exec|system\s*\()"
+
+# 900105 — WP: rate-limit en wp-login (20 POST / 5min por IP)
+SecAction "id:9001050,phase:1,pass,nolog,initcol:ip=%{REMOTE_ADDR},setvar:ip.wp_login_cnt=+0"
+SecRule REQUEST_URI "@endsWith /wp-login.php" "id:9001051,phase:2,pass,log,chain,msg:'WP login tracking'"
+ SecRule REQUEST_METHOD "@streq POST" "setvar:ip.wp_login_cnt=+1,expirevar:ip.wp_login_cnt=300"
+SecRule IP:wp_login_cnt "@gt 20" \
+ "id:9001052,phase:2,deny,status:403,log,msg:'WP login rate-limit (20 POST/5min por IP)'"
+
+# 900106 — (OPCIONAL) bloquea XML-RPC si no lo usas globalmente por Apache
+# SecRule REQUEST_URI "@endsWith /xmlrpc.php" \
+#  "id:900106,phase:1,deny,status:403,log,msg:'XML-RPC deshabilitado (baseline)'"
 ```
 
-5. Guardá los cambios.
-6. Reiniciá Apache si te lo solicita.
-
 ---
 
-### 🧠 ¿Qué hacen estas reglas?
+# Excepciones por dominio (solo si un cliente lo necesita)
 
-* Bloquean rutas típicas de phishing aunque el dominio sea nuevo.
-* Previenen cargas de formularios con archivos maliciosos.
-* Detectan parámetros comunes usados en redirecciones maliciosas (`email=`, `to=`, etc.).
+Pégalos en **ModSecurity → Rules** del dominio o en el include del vhost correspondiente.
 
----
+```apache
+# Permitir Bytespider SOLO para un dominio
+SecRule REQUEST_HEADERS:User-Agent "@contains Bytespider" \
+ "id:990901,phase:1,pass,ctl:ruleRemoveById=900103,log,msg:'Allow Bytespider en este vhost'"
 
-## 🔧 PARTE 3 (Opcional pero recomendado) – Bloquear `mail()` desde PHP
+# Permitir XML-RPC en un dominio (si lo bloqueaste globalmente)
+<LocationMatch "^/xmlrpc\.php$">
+  SecRuleRemoveById 900106
+</LocationMatch>
 
-### ✅ Cómo hacerlo por WHM o directamente en `php.ini`:
-
-1. En WHM, andá a:
-   👉 **Software > MultiPHP INI Editor**
-2. Seleccioná una versión de PHP usada en tu servidor.
-3. En **Editor de configuración básica**, bajá hasta encontrar:
-   👉 `disable_functions`
-4. Agregá (o asegurate de que estén) las siguientes funciones:
-
-```
-mail, exec, shell_exec, system, passthru, popen, proc_open
+# Excluir dotfiles para una ruta puntual (si un plugin raro lo requiere)
+<LocationMatch "^/contact/\.ajax">
+  SecRuleRemoveById 900020
+</LocationMatch>
 ```
 
-5. Guardá los cambios.
-
-📌 Alternativa: ponelo directamente en el `php.ini` global o por cuenta, si usás CloudLinux o configuración avanzada.
-
 ---
 
-## ✅ Resultado final:
+# Después de aplicar
 
-Con estos tres pasos:
+```bash
+apachectl -t              # validar sintaxis
+/scripts/restartsrv_httpd # reiniciar Apache (cPanel)
+```
 
-* Cortás **la ejecución maliciosa**
-* Prevenís **subidas y acceso a rutas fraudulentas**
-* Evitás que scripts **envíen spam o phishing**
+12–24 h después, chequea actividad:
 
----
+```bash
+grep -Po 'id "\K[0-9]+' /usr/local/apache/logs/modsec_audit.log \
+| sort | uniq -c | sort -nr | head -20
+```
 
-¿Querés que te arme un `.txt` con todo esto listo para guardar como checklist o documentación interna?
+**Compromiso:** si vuelves a preguntar, me referiré a este mismo **Baseline v1.0**.
+Solo agregaríamos una regla nueva si aparece un **patrón de ataque nuevo y recurrente**; el baseline no se toca por capricho.
