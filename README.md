@@ -29,51 +29,34 @@ WHM → Service Configuration → Apache Configuration → **Include Editor** �
 
 # ModSecurity (global, persistente)
 
-Ok. Te dejo **reglas concretas** hechas **solo** con los patrones que vos recibiste en los reportes (indexmc.php, index2.php, email.php, chameleon2.html, mygov-login.html, droppers `/0` y `/o`, `.env`, `.git`, PHP en uploads).
-Están **ancladas al docroot** y/o a `uploads` para **no romper Elementor / REST**. Copiá y pegá tal cual.
-
----
-
-# Reglas “anti-phishing kits” (seguras y específicas)
-
-> Pegar en: `/etc/apache2/conf.d/modsec/modsec2.user.conf` (cPanel/Apache)
-> Luego: `systemctl reload apache2` (o `httpd`)
 
 ```apache
-# ========== BLOQUEOS NO CONTROVERSIALES ==========
-# PHP en uploads -> kits y webshells plantados en /uploads  (no lo usa WP)
+# 930201 — Cualquier PHP público que NO sea un entrypoint legítimo de WP  → 403
+# Permite: index.php, wp-login.php, xmlrpc.php, wp-cron.php, wp-comments-post.php,
+#          wp-activate.php, wp-signup.php, wp-trackback.php y TODO lo bajo /wp-admin/
+SecRule REQUEST_URI "@rx \.ph(p[0-9]?|tml|ps|ar)(?:$|\?)" \
+ "id:930201,phase:1,deny,status:403,log,msg:'Direct PHP no permitido (whitelist WP)',chain"
+ SecRule REQUEST_URI "!@rx ^/(index\.php|wp-login\.php|xmlrpc\.php|wp-cron\.php|wp-comments-post\.php|wp-activate\.php|wp-signup\.php|wp-trackback\.php)(?:$|\?)" "chain"
+ SecRule REQUEST_URI "!@rx ^/wp-admin/"
+
+# 930212 — Nunca ejecutar PHP dentro de /wp-content/uploads/     → 403
 SecRule REQUEST_URI "@rx ^/(?:[^/]+/)?wp-content/uploads/.*\.(?:ph(?:p[0-9]?|tml|ps|ar))(?:$|\?)" \
- "id:920012,phase:1,deny,status:403,log,msg:'PHP en uploads bloqueado'"
+ "id:930212,phase:1,deny,status:403,log,msg:'PHP en uploads bloqueado'"
 
-# Dotfiles (.env, .git, etc.) -> bots y kits
+# 930220 — Bloquear dotfiles (/.env, /.git/HEAD, etc.)            → 403
 SecRule REQUEST_URI "@rx (^|/)\.[^/]" \
- "id:920020,phase:1,deny,status:403,log,msg:'Dotfile oculto (/.env, /.git, ...)'"
+ "id:930220,phase:1,deny,status:403,log,msg:'Dotfile oculto (/.env, /.git, ...)'"
 
-# ========== PATRONES EXACTOS DE TUS REPORTES ==========
-# indexmc.php / index2.php / email.php (SOLO en docroot: ^/ )
+# ============================================================
+# OPCIONAL (aprieta sobre kits reportados SIN riesgos colaterales)
+# ============================================================
+
+# 930230 — indexmc/index2/email en docroot (exacto, no toca WP)
 SecRule REQUEST_URI "@rx (?i)^/(?:indexmc|index2|email)\.php(?:$|\?)" \
- "id:920110,phase:1,deny,status:403,log,msg:'Phishing kit: indexmc/index2/email en docroot'"
+ "id:930230,phase:1,deny,status:403,log,msg:'Kit phishing: indexmc/index2/email en docroot'"
 
-# chameleon2.html y mygov-login.html (SOLO en docroot)
-SecRule REQUEST_URI "@rx (?i)^/(?:chameleon2\.html|mygov-login\.html)(?:$|\?)" \
- "id:920111,phase:1,deny,status:403,log,msg:'Phishing kit: chameleon2/mygov-login en docroot'"
-
-# Droppers /0 y /o en docroot (muy usados para redirecciones de kits)
-# Si algún sitio TUYO usa /o/ legítimo, comenta la 920122.
-SecRule REQUEST_URI "@rx ^/0(?:$|[\?/])" \
- "id:920121,phase:1,deny,status:403,log,msg:'Dropper /0 en docroot'"
-SecRule REQUEST_URI "@rx ^/o(?:$|/|\?)" \
- "id:920122,phase:1,deny,status:403,log,msg:'Dropper /o en docroot'"
-
-# ========== (OPCIONAL PERO ÚTIL) .php desconocidos en docroot ==========
-# Permite sólo entrypoints WP conocidos; el resto *.php en docroot -> 403.
-# Si algún sitio tiene un .php propio en docroot, añadilo a la allowlist.
-SecRule REQUEST_URI "@rx ^/[^/]+\.(?:ph(?:p[0-9]?|tml|ps|ar))(?:$|\?)" \
- "id:920130,phase:1,deny,status:403,log,msg:'PHP desconocido en docroot',chain"
-  SecRule REQUEST_URI "!@pm index.php wp-login.php wp-cron.php xmlrpc.php wp-comments-post.php wp-activate.php wp-signup.php wp-trackback.php license.php"
-
-# ========= NADA QUE TOQUE ELEMENTOR / REST =========
-# (No hace falta excluir nada porque las reglas de arriba no miran admin-ajax ni wp-json)
+# NOTA: NO incluimos /0 o /o para evitar falsos positivos; si algún dominio los usa,
+#       se puede evaluar caso por caso con una regla anclada y probada antes.
 ```
 
 ---
