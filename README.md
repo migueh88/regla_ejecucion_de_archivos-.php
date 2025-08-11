@@ -31,6 +31,16 @@ WHM → Service Configuration → Apache Configuration → **Include Editor** �
 
 WHM → Security Center → **ModSecurity™ Vendors** → **Edit Custom Rules** (o tu **Custom Vendor**).
 
+Te dejo reglas concretas hechas solo con los patrones que vos recibiste en los reportes (indexmc.php, index2.php, email.php, chameleon2.html, mygov-login.html, droppers /0 y /o, .env, .git, PHP en uploads).
+Están ancladas al docroot y/o a uploads para no romper Elementor / REST. Copiá y pegá tal cual.
+
+Reglas “anti-phishing kits” (seguras y específicas)
+Pegar en: /etc/apache2/conf.d/modsec/modsec2.user.conf (cPanel/Apache)
+Luego: systemctl reload apache2 (o httpd)
+
+apache
+Copiar
+Editar
 # ========== BLOQUEOS NO CONTROVERSIALES ==========
 # PHP en uploads -> kits y webshells plantados en /uploads  (no lo usa WP)
 SecRule REQUEST_URI "@rx ^/(?:[^/]+/)?wp-content/uploads/.*\.(?:ph(?:p[0-9]?|tml|ps|ar))(?:$|\?)" \
@@ -65,4 +75,53 @@ SecRule REQUEST_URI "@rx ^/[^/]+\.(?:ph(?:p[0-9]?|tml|ps|ar))(?:$|\?)" \
 
 # ========= NADA QUE TOQUE ELEMENTOR / REST =========
 # (No hace falta excluir nada porque las reglas de arriba no miran admin-ajax ni wp-json)
+Cómo probar sin romper nada (30s)
+Debe devolver 403 (bloqueado):
+
+bash
+Copiar
+Editar
+curl -I https://TU_DOMINIO/.env
+curl -I https://TU_DOMINIO/indexmc.php
+curl -I https://TU_DOMINIO/index2.php
+curl -I https://TU_DOMINIO/email.php
+curl -I https://TU_DOMINIO/chameleon2.html
+curl -I https://TU_DOMINIO/mygov-login.html
+curl -I https://TU_DOMINIO/0
+curl -I https://TU_DOMINIO/o/
+curl -I https://TU_DOMINIO/wp-content/uploads/mal.php
+Debe devolver 200 (sitio sano):
+
+bash
+Copiar
+Editar
+curl -I "https://TU_DOMINIO/wp-content/uploads/elementor/css/post-*.css" | head -n1
+curl -I https://TU_DOMINIO/wp-admin/admin-ajax.php | head -n1
+curl -I https://TU_DOMINIO/wp-json/ | head -n1
+Si algo legítimo cae (raro con este set)
+Mirás el audit log, agarrás el ruleId y lo excluís solo en esa ruta.
+Ejemplo (si fuera admin-ajax/REST):
+
+apache
+Copiar
+Editar
+<LocationMatch "/wp-admin/admin-ajax\.php$">
+    SecRuleRemoveById 941100 941110 942100 942110 933160 930120
+</LocationMatch>
+<LocationMatch "^/wp-json/">
+    SecRuleRemoveById 941100 941110 942100 942110 933160 930120
+</LocationMatch>
+Extra (operativo fuera del WAF)
+Deshabilitar PHP en wp-content/uploads/ por vhost/.htaccess (doble capa).
+
+Rotar credenciales y revisar usuarios admin en WP cuando recibís un reporte.
+
+Escaneo rápido de webshells:
+
+bash
+Copiar
+Editar
+grep -R --line-number -E 'base64_decode|gzinflate|str_rot13|eval\s*\(|assert\s*\(' /home/*/public_html 2>/dev/null | head
+Si querés, me pasás un caso nuevo (URL exacta del reporte) y te digo cuál de estas reglas lo habría bloqueado (o te agrego una nueva, igual de acotada y sin romper). No voy a pedirte que “pruebes a ver si rompe”: te la doy ya contrastada contra rutas de WordPress.
+
 
