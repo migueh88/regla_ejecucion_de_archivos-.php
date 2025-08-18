@@ -39,6 +39,9 @@ SecRule REQUEST_URI "@rx \.ph(p[0-9]?|tml|ps|ar)(?:$|\?)" \
 SecRule REQUEST_URI "@rx ^/(?:[^/]+/)?wp-content/uploads/.*\.(?:ph(?:p[0-9]?|tml|ps|ar))(?:$|\?)" \
  "id:930212,phase:1,deny,status:403,log,msg:'PHP en uploads bloqueado'"
 
+SecRule REQUEST_URI "@rx (^|/)\.[^/]" \
+ "id:930220,phase:1,deny,status:403,log,msg:'Dotfile oculto (/.env, /.git, ...)'"
+
 # 930242 — Bloquear cualquier archivo PHP oculto (.loquesea.php) → 403
 SecRule REQUEST_URI "@rx (^|/)\.[^/].*\.ph(p[0-9]?|tml|ps|ar)(?:$|\?)" \
  "id:930242,phase:1,deny,status:403,log,msg:'PHP oculto bloqueado (.filename.php)'"
