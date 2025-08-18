@@ -31,32 +31,28 @@ WHM → Service Configuration → Apache Configuration → **Include Editor** �
 
 
 ```apache
-# 930201 — Cualquier PHP público que NO sea un entrypoint legítimo de WP  → 403
-# Permite: index.php, wp-login.php, xmlrpc.php, wp-cron.php, wp-comments-post.php,
-#          wp-activate.php, wp-signup.php, wp-trackback.php y TODO lo bajo /wp-admin/
 SecRule REQUEST_URI "@rx \.ph(p[0-9]?|tml|ps|ar)(?:$|\?)" \
  "id:930201,phase:1,deny,status:403,log,msg:'Direct PHP no permitido (whitelist WP)',chain"
  SecRule REQUEST_URI "!@rx ^/(index\.php|wp-login\.php|xmlrpc\.php|wp-cron\.php|wp-comments-post\.php|wp-activate\.php|wp-signup\.php|wp-trackback\.php)(?:$|\?)" "chain"
  SecRule REQUEST_URI "!@rx ^/wp-admin/"
 
-# 930212 — Nunca ejecutar PHP dentro de /wp-content/uploads/     → 403
 SecRule REQUEST_URI "@rx ^/(?:[^/]+/)?wp-content/uploads/.*\.(?:ph(?:p[0-9]?|tml|ps|ar))(?:$|\?)" \
  "id:930212,phase:1,deny,status:403,log,msg:'PHP en uploads bloqueado'"
 
-# 930220 — Bloquear dotfiles (/.env, /.git/HEAD, etc.)            → 403
 SecRule REQUEST_URI "@rx (^|/)\.[^/]" \
  "id:930220,phase:1,deny,status:403,log,msg:'Dotfile oculto (/.env, /.git, ...)'"
 
-# ============================================================
-# OPCIONAL (aprieta sobre kits reportados SIN riesgos colaterales)
-# ============================================================
-
-# 930230 — indexmc/index2/email en docroot (exacto, no toca WP)
 SecRule REQUEST_URI "@rx (?i)^/(?:indexmc|index2|email)\.php(?:$|\?)" \
  "id:930230,phase:1,deny,status:403,log,msg:'Kit phishing: indexmc/index2/email en docroot'"
 
-# NOTA: NO incluimos /0 o /o para evitar falsos positivos; si algún dominio los usa,
-#       se puede evaluar caso por caso con una regla anclada y probada antes.
+SecRule REQUEST_FILENAME "@endsWith .php" \
+ "id:930240,phase:1,deny,status:403,log,msg:'PHP no autorizado en docroot (excepto WP core)',chain"
+ SecRule REQUEST_URI "!@rx ^/(index\.php|wp-login\.php|xmlrpc\.php|wp-cron\.php|wp-comments-post\.php|wp-activate\.php|wp-signup\.php|wp-trackback\.php)(?:$|\?)" "chain"
+ SecRule REQUEST_URI "!@rx ^/wp-admin/"
+
+SecRule REQUEST_METHOD "POST" \
+ "id:930241,phase:1,deny,status:403,log,msg:'POST a docroot',chain"
+ SecRule REQUEST_HEADERS:Content-Type "@contains multipart/form-data"
 ```
 
 ---
