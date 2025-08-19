@@ -64,79 +64,93 @@ SecRule REQUEST_METHOD "POST" \
 # Ubicación sugerida: /etc/apache2/conf.d/modsec_vendor_configs/custom-rules.conf
 ###############################################################################
 
+# ---------------------------------------------------------------------------
+# Exclusiones específicas
+# ---------------------------------------------------------------------------
+
+# Excepción Softaculous → WordPress autologin (fase 1)
+SecRule REQUEST_URI "@rx ^/sapp-wp-signon\.php(?:$|\?)" \
+"id:1001301,phase:1,pass,nolog,\
+ctl:ruleRemoveById=930201,\
+ctl:ruleRemoveById=930240,\
+ctl:ruleRemoveById=1001220,\
+msg:'Whitelist Softaculous sapp-wp-signon.php (phase 1)'"
+
+# Excepción Softaculous → WordPress autologin (fase 2)
+SecRule REQUEST_URI "@rx ^/sapp-wp-signon\.php(?:$|\?)" \
+"id:1001304,phase:2,pass,nolog,\
+ctl:ruleRemoveById=930201,\
+ctl:ruleRemoveById=930240,\
+ctl:ruleRemoveById=1001220,\
+msg:'Whitelist Softaculous sapp-wp-signon.php (phase 2)'"
+
+# Permitir assets/JS del admin que vienen de PHP
+SecRule REQUEST_URI "@rx ^/wp-admin/(?:load-(?:styles|scripts)\.php|admin-ajax\.php|admin-post\.php|async-upload\.php)(?:$|\?)" \
+"id:1001310,phase:1,pass,nolog,ctl:ruleRemoveById=1001220,msg:'Allow WP admin assets endpoints'"
+
+# Permitir TinyMCE del editor clásico
+SecRule REQUEST_URI "@rx ^/wp-includes/js/tinymce/wp-tinymce\.php(?:$|\?)" \
+"id:1001311,phase:1,pass,nolog,ctl:ruleRemoveById=1001220,msg:'Allow TinyMCE asset'"
+
+# Opción más amplia: omitir la 1001220 para todo /wp-admin/
+SecRule REQUEST_URI "@beginsWith /wp-admin/" \
+"id:1001312,phase:1,pass,nolog,ctl:ruleRemoveById=1001220,msg:'Skip 1001220 in wp-admin'"
+
 ###############################################################################
+# Reglas de protección
+###############################################################################
+
 # 930201 — Bloquear ejecución directa de PHP fuera del core de WP
-###############################################################################
 SecRule REQUEST_URI "@rx \.ph(p[0-9]?|tml|ps|ar)(?:$|\?)" \
- "id:930201,phase:1,deny,status:403,log,msg:'Direct PHP no permitido (whitelist WP)',chain"
+"id:930201,phase:1,deny,status:403,log,msg:'Direct PHP no permitido (whitelist WP)',chain"
  SecRule REQUEST_URI "!@rx ^/(index\.php|wp-login\.php|xmlrpc\.php|wp-cron\.php|wp-comments-post\.php|wp-activate\.php|wp-signup\.php|wp-trackback\.php)(?:$|\?)" "chain"
  SecRule REQUEST_URI "!@rx ^/wp-admin/"
 
-###############################################################################
 # 930212 — Bloquear PHP en uploads/
-###############################################################################
 SecRule REQUEST_URI "@rx ^/(?:[^/]+/)?wp-content/uploads/.*\.(?:ph(?:p[0-9]?|tml|ps|ar))(?:$|\?)" \
- "id:930212,phase:1,deny,status:403,log,msg:'PHP en uploads bloqueado'"
+"id:930212,phase:1,deny,status:403,log,msg:'PHP en uploads bloqueado'"
 
-###############################################################################
 # 930220 — Bloquear dotfiles ocultos (/.env, /.git, etc.)
-###############################################################################
 SecRule REQUEST_URI "@rx (^|/)\.[^/]" \
- "id:930220,phase:1,deny,status:403,log,msg:'Dotfile oculto (/.env, /.git, ...)'"
+"id:930220,phase:1,deny,status:403,log,msg:'Dotfile oculto (/.env, /.git, ...)'"
 
-###############################################################################
 # 930242 — Bloquear PHP oculto (.loquesea.php)
-###############################################################################
 SecRule REQUEST_URI "@rx (^|/)\.[^/].*\.ph(p[0-9]?|tml|ps|ar)(?:$|\?)" \
- "id:930242,phase:1,deny,status:403,log,msg:'PHP oculto bloqueado (.filename.php)'"
+"id:930242,phase:1,deny,status:403,log,msg:'PHP oculto bloqueado (.filename.php)'"
 
-###############################################################################
 # 930230 — Detectar kits phishing comunes (indexmc/index2/email.php)
-###############################################################################
 SecRule REQUEST_URI "@rx (?i)^/(?:indexmc|index2|email)\.php(?:$|\?)" \
- "id:930230,phase:1,deny,status:403,log,msg:'Kit phishing detectado en docroot'"
+"id:930230,phase:1,deny,status:403,log,msg:'Kit phishing detectado en docroot'"
 
-###############################################################################
 # 930240 — Bloquear PHP en docroot (excepto core WP)
-###############################################################################
 SecRule REQUEST_FILENAME "@endsWith .php" \
- "id:930240,phase:1,deny,status:403,log,msg:'PHP no autorizado en docroot (excepto WP core)',chain"
+"id:930240,phase:1,deny,status:403,log,msg:'PHP no autorizado en docroot (excepto WP core)',chain"
  SecRule REQUEST_URI "!@rx ^/(index\.php|wp-login\.php|xmlrpc\.php|wp-cron\.php|wp-comments-post\.php|wp-activate\.php|wp-signup\.php|wp-trackback\.php)(?:$|\?)" "chain"
  SecRule REQUEST_URI "!@rx ^/wp-admin/"
 
-###############################################################################
 # 930241 — Bloquear POST multipart al docroot
-###############################################################################
 SecRule REQUEST_URI "@rx ^/(?:$|\?)" \
- "id:930241,phase:1,deny,status:403,log,msg:'POST multipart al docroot',chain"
+"id:930241,phase:1,deny,status:403,log,msg:'POST multipart al docroot',chain"
  SecRule REQUEST_METHOD "POST" "chain"
  SecRule REQUEST_HEADERS:Content-Type "@contains multipart/form-data"
 
-###############################################################################
 # 1001200 — Bloquear HTML/HTM estático (anti-phishing)
-###############################################################################
 SecRule REQUEST_URI "@rx (?i)\.html?(?:$|\?)" \
- "id:1001200,phase:1,deny,status:403,log,msg:'HTML estático bloqueado',chain"
+"id:1001200,phase:1,deny,status:403,log,msg:'HTML estático bloqueado',chain"
  SecRule REQUEST_URI "!@rx (?i)^/(sitemap[^/]*\.html?|wp-)"
 
-###############################################################################
 # 1001210 — Bloquear nombres típicos de kits
-###############################################################################
 SecRule REQUEST_URI "@rx (?i)/(?:bot|bots?|bots2|filter|proxyblock|next)\.php(?:$|\?)" \
- "id:1001210,phase:1,deny,status:403,log,msg:'Archivo de kit de phishing bloqueado'"
+"id:1001210,phase:1,deny,status:403,log,msg:'Archivo de kit de phishing bloqueado'"
 
-###############################################################################
 # 1001220 — Solo servir extensiones “seguras” (assets estáticos)
-# Permite: css, js, imágenes, fuentes, json, xml, txt, map, webmanifest, pdf/otf
-###############################################################################
 SecRule REQUEST_URI "@rx (?i)\.([a-z0-9]{1,6})(?:$|\?)" \
- "id:1001220,phase:1,deny,status:403,log,capture,msg:'Extensión no segura',chain"
+"id:1001220,phase:1,deny,status:403,log,capture,msg:'Extensión no segura',chain"
  SecRule TX:1 "!@rx ^(?:css|js|mjs|png|jpg|jpeg|gif|webp|svg|ico|bmp|json|xml|txt|map|woff|woff2|ttf|eot|webmanifest|otf|pdf)$"
 
 ###############################################################################
 # FIN DE LAS CUSTOM RULES
 ###############################################################################
-
 ```
 
 ## Cómo probar sin romper nada (30s)
