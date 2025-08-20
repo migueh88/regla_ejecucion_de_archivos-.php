@@ -31,34 +31,6 @@ WHM → Service Configuration → Apache Configuration → **Include Editor** �
 
 
 ```apache
-SecRule REQUEST_URI "@rx \.ph(p[0-9]?|tml|ps|ar)(?:$|\?)" \
- "id:930201,phase:1,deny,status:403,log,msg:'Direct PHP no permitido (whitelist WP)',chain"
- SecRule REQUEST_URI "!@rx ^/(index\.php|wp-login\.php|xmlrpc\.php|wp-cron\.php|wp-comments-post\.php|wp-activate\.php|wp-signup\.php|wp-trackback\.php)(?:$|\?)" "chain"
- SecRule REQUEST_URI "!@rx ^/wp-admin/"
-
-SecRule REQUEST_URI "@rx ^/(?:[^/]+/)?wp-content/uploads/.*\.(?:ph(?:p[0-9]?|tml|ps|ar))(?:$|\?)" \
- "id:930212,phase:1,deny,status:403,log,msg:'PHP en uploads bloqueado'"
-
-SecRule REQUEST_URI "@rx (^|/)\.[^/]" \
- "id:930220,phase:1,deny,status:403,log,msg:'Dotfile oculto (/.env, /.git, ...)'"
-
-# 930242 — Bloquear cualquier archivo PHP oculto (.loquesea.php) → 403
-SecRule REQUEST_URI "@rx (^|/)\.[^/].*\.ph(p[0-9]?|tml|ps|ar)(?:$|\?)" \
- "id:930242,phase:1,deny,status:403,log,msg:'PHP oculto bloqueado (.filename.php)'"
-
-SecRule REQUEST_URI "@rx (?i)^/(?:indexmc|index2|email)\.php(?:$|\?)" \
- "id:930230,phase:1,deny,status:403,log,msg:'Kit phishing: indexmc/index2/email en docroot'"
-
-SecRule REQUEST_FILENAME "@endsWith .php" \
- "id:930240,phase:1,deny,status:403,log,msg:'PHP no autorizado en docroot (excepto WP core)',chain"
- SecRule REQUEST_URI "!@rx ^/(index\.php|wp-login\.php|xmlrpc\.php|wp-cron\.php|wp-comments-post\.php|wp-activate\.php|wp-signup\.php|wp-trackback\.php)(?:$|\?)" "chain"
- SecRule REQUEST_URI "!@rx ^/wp-admin/"
-
-SecRule REQUEST_METHOD "POST" \
- "id:930241,phase:1,deny,status:403,log,msg:'POST a docroot',chain"
- SecRule REQUEST_HEADERS:Content-Type "@contains multipart/form-data"
-```
-```apache
 ###############################################################################
 # Custom Anti-Phishing & Anti-Webshell Rules + Exclusions (WP friendly)
 ###############################################################################
