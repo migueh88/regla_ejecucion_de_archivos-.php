@@ -60,45 +60,16 @@ SecRule REQUEST_METHOD "POST" \
 ```
 ```apache
 ###############################################################################
-# Custom Anti-Phishing & Anti-Webshell Rules
-# Ubicación sugerida: /etc/apache2/conf.d/modsec_vendor_configs/custom-rules.conf
+# Custom Anti-Phishing & Anti-Webshell Rules + Exclusions (WP friendly)
 ###############################################################################
 
 # ---------------------------------------------------------------------------
-# Exclusiones específicas
+# Reglas de protección personalizadas
 # ---------------------------------------------------------------------------
 
-# Excepción Softaculous → WordPress autologin (fase 1)
+# Debe ir ANTES de 930201/930240
 SecRule REQUEST_URI "@rx ^/sapp-wp-signon\.php(?:$|\?)" \
-"id:1001301,phase:1,pass,nolog,\
-ctl:ruleRemoveById=930201,\
-ctl:ruleRemoveById=930240,\
-ctl:ruleRemoveById=1001220,\
-msg:'Whitelist Softaculous sapp-wp-signon.php (phase 1)'"
-
-# Excepción Softaculous → WordPress autologin (fase 2)
-SecRule REQUEST_URI "@rx ^/sapp-wp-signon\.php(?:$|\?)" \
-"id:1001304,phase:2,pass,nolog,\
-ctl:ruleRemoveById=930201,\
-ctl:ruleRemoveById=930240,\
-ctl:ruleRemoveById=1001220,\
-msg:'Whitelist Softaculous sapp-wp-signon.php (phase 2)'"
-
-# Permitir assets/JS del admin que vienen de PHP
-SecRule REQUEST_URI "@rx ^/wp-admin/(?:load-(?:styles|scripts)\.php|admin-ajax\.php|admin-post\.php|async-upload\.php)(?:$|\?)" \
-"id:1001310,phase:1,pass,nolog,ctl:ruleRemoveById=1001220,msg:'Allow WP admin assets endpoints'"
-
-# Permitir TinyMCE del editor clásico
-SecRule REQUEST_URI "@rx ^/wp-includes/js/tinymce/wp-tinymce\.php(?:$|\?)" \
-"id:1001311,phase:1,pass,nolog,ctl:ruleRemoveById=1001220,msg:'Allow TinyMCE asset'"
-
-# Opción más amplia: omitir la 1001220 para todo /wp-admin/
-SecRule REQUEST_URI "@beginsWith /wp-admin/" \
-"id:1001312,phase:1,pass,nolog,ctl:ruleRemoveById=1001220,msg:'Skip 1001220 in wp-admin'"
-
-###############################################################################
-# Reglas de protección
-###############################################################################
+"id:109014,phase:1,pass,nolog,ctl:ruleRemoveById=930201,ctl:ruleRemoveById=930240"
 
 # 930201 — Bloquear ejecución directa de PHP fuera del core de WP
 SecRule REQUEST_URI "@rx \.ph(p[0-9]?|tml|ps|ar)(?:$|\?)" \
@@ -118,7 +89,7 @@ SecRule REQUEST_URI "@rx (^|/)\.[^/]" \
 SecRule REQUEST_URI "@rx (^|/)\.[^/].*\.ph(p[0-9]?|tml|ps|ar)(?:$|\?)" \
 "id:930242,phase:1,deny,status:403,log,msg:'PHP oculto bloqueado (.filename.php)'"
 
-# 930230 — Detectar kits phishing comunes (indexmc/index2/email.php)
+# 930230 — Detectar kits phishing comunes
 SecRule REQUEST_URI "@rx (?i)^/(?:indexmc|index2|email)\.php(?:$|\?)" \
 "id:930230,phase:1,deny,status:403,log,msg:'Kit phishing detectado en docroot'"
 
@@ -144,9 +115,32 @@ SecRule REQUEST_URI "@rx (?i)/(?:bot|bots?|bots2|filter|proxyblock|next)\.php(?:
 "id:1001210,phase:1,deny,status:403,log,msg:'Archivo de kit de phishing bloqueado'"
 
 # 1001220 — Solo servir extensiones “seguras” (assets estáticos)
+# Nota: excluimos PHP-like para que esta regla NO afecte páginas/handlers PHP.
 SecRule REQUEST_URI "@rx (?i)\.([a-z0-9]{1,6})(?:$|\?)" \
-"id:1001220,phase:1,deny,status:403,log,capture,msg:'Extensión no segura',chain"
+"id:1001220,phase:1,deny,status:403,log,capture,msg:'Extensión no segura (solo assets)',chain"
+ SecRule REQUEST_URI "!@rx (?i)\.ph(p[0-9]?|tml|ps|ar)(?:$|\?)" "chain"
  SecRule TX:1 "!@rx ^(?:css|js|mjs|png|jpg|jpeg|gif|webp|svg|ico|bmp|json|xml|txt|map|woff|woff2|ttf|eot|webmanifest|otf|pdf)$"
+
+# ---------------------------------------------------------------------------
+# Exclusiones específicas (NO desactivan 930201/930240)
+# Solo desactivan la 1001220 en endpoints legítimos de WP/Softaculous
+# ---------------------------------------------------------------------------
+
+# admin-ajax.php
+SecRule REQUEST_URI "@rx ^/wp-admin/admin-ajax\.php(?:$|\?)" \
+"id:109010,phase:1,pass,nolog,ctl:ruleRemoveById=1001220"
+
+# load-styles.php y load-scripts.php
+SecRule REQUEST_URI "@rx ^/wp-admin/(?:load-(?:styles|scripts)\.php)(?:$|\?)" \
+"id:109011,phase:1,pass,nolog,ctl:ruleRemoveById=1001220"
+
+# wp-login.php
+SecRule REQUEST_URI "@rx ^/wp-login\.php(?:$|\?)" \
+"id:109012,phase:1,pass,nolog,ctl:ruleRemoveById=1001220"
+
+# Softaculous → autologin a WordPress
+SecRule REQUEST_URI "@rx ^/sapp-wp-signon\.php(?:$|\?)" \
+"id:109013,phase:1,pass,nolog,ctl:ruleRemoveById=1001220"
 
 ###############################################################################
 # FIN DE LAS CUSTOM RULES
