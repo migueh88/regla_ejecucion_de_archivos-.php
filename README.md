@@ -6,23 +6,43 @@ genial — acá va el **Baseline WAF Hosting WP — v1.0 — 2025-08-11** listo 
 WHM → Service Configuration → Apache Configuration → **Include Editor** → **Pre VirtualHost Include** → **All Versions**.
 
 ```apache
-# === BASELINE: BLOQUEAR EJECUCIÓN DE PHP EN CARPETAS DE SUBIDAS ===
-# Seguro y universal (especialmente WordPress).
-<DirectoryMatch "^/home[0-9]*/[^/]+/public_html(?:/[^/]+)?/(?:wp-content/uploads|uploads|media|images|docs|files|assets)(?:/.*)?$">
+# ===== Reglas de seguridad Apache para WordPress + Softaculous =====
+
+# Docroot: deniega PHP por defecto y permite solo WP core + Softaculous
+<DirectoryMatch "^/home[0-9]*/[^/]+/public_html/?$">
+  <FilesMatch "\.(php|phtml|phar|phps)$">
+    Require all denied
+  </FilesMatch>
+  <FilesMatch "^(index|wp-(?:login|cron|comments-post|activate|signup|trackback))\.php$|^sapp-wp-signon\.php$">
+    Require all granted
+  </FilesMatch>
+</DirectoryMatch>
+
+# wp-admin: permitir todos los .php (necesarios para la administración)
+<DirectoryMatch "^/home[0-9]*/[^/]+/public_html/wp-admin/?$">
+  <FilesMatch "\.php$">
+    Require all granted
+  </FilesMatch>
+</DirectoryMatch>
+
+# wp-includes: permitir PHP (necesario para core de WP)
+<DirectoryMatch "^/home[0-9]*/[^/]+/public_html/wp-includes/?$">
+  <FilesMatch "\.php$">
+    Require all granted
+  </FilesMatch>
+</DirectoryMatch>
+
+# Uploads y carpetas similares: sin PHP (bloquea webshells)
+<DirectoryMatch "^/home[0-9]*/[^/]+/public_html/(?:wp-content/uploads|uploads|media|images|docs|files|assets)(?:/.*)?$">
   <FilesMatch "\.ph(p[0-9]?|tml|ps|ar)$">
     Require all denied
   </FilesMatch>
 </DirectoryMatch>
 
-# Permitir validaciones (ACME/SSL) incluso si ModSecurity bloquea dotfiles.
+# Permitir validaciones de SSL (Let's Encrypt, etc.)
 <LocationMatch "^/\.well-known/">
   Require all granted
 </LocationMatch>
-
-# (OPCIONAL) Si la mayoría NO usa XML-RPC, puedes negar aquí:
-# <LocationMatch "^/xmlrpc\.php$">
-#   Require all denied
-# </LocationMatch>
 ```
 
 ---
