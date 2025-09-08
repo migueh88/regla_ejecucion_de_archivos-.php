@@ -59,6 +59,18 @@ WHM → Service Configuration → Apache Configuration → **Include Editor** �
 # Reglas de protección personalizadas
 # ---------------------------------------------------------------------------
 
+# === ACME (Let's Encrypt) allow-only-for-challenge ==========================
+# 1) Para requests a //.well-known/acme-challenge/<token> (solo letras, números, _ y -),
+#    desactiva ModSecurity SOLO en esa request.
+SecRule REQUEST_URI "@rx ^/\.well-known/acme-challenge/[-_A-Za-z0-9]{20,}$" \
+    "id:9005001,phase:1,pass,nolog,ctl:ruleEngine=Off"
+
+# 2) Para cualquier otra cosa dentro de esa carpeta que NO sea GET/HEAD, bloquear.
+SecRule REQUEST_URI "@rx ^/\.well-known/acme-challenge(/|$)" \
+    "id:9005002,phase:1,deny,status:403,log,chain"
+    SecRule REQUEST_METHOD "!^(GET|HEAD)$"
+# ===========================================================================
+
 # Debe ir ANTES de 930201/930240
 SecRule REQUEST_URI "@rx ^/sapp-wp-signon\.php(?:$|\?)" \
 "id:109014,phase:1,pass,nolog,ctl:ruleRemoveById=930201,ctl:ruleRemoveById=930240"
