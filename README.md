@@ -43,6 +43,13 @@ WHM → Service Configuration → Apache Configuration → **Include Editor** �
 <LocationMatch "^/\.well-known/">
   Require all granted
 </LocationMatch>
+
+# Redirección forzada a HTTPS
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
 ```
 
 ---
