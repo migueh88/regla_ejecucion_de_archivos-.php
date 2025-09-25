@@ -82,7 +82,9 @@ SecRule REQUEST_URI "@rx ^/\.well-known/acme-challenge(/|$)" \
 SecRule REQUEST_URI "@rx ^/sapp-wp-signon\.php(?:$|\?)" \
 "id:109014,phase:1,pass,nolog,ctl:ruleRemoveById=930201,ctl:ruleRemoveById=930240"
 
-# --- WPMU DEV Hub: excepción para wp-load.php con el parámetro wpmudev-hub
+# --- WPMU DEV Hub: excepción para /wp-load.php con el parámetro "wpmudev-hub"
+# (PÉGALO ANTES de 930201 y 930240; fuera de <IfModule>)
+
 SecRule REQUEST_FILENAME "@endsWith /wp-load.php" \
     "id:1000003,phase:1,pass,nolog,ctl:ruleRemoveById=930201,ctl:ruleRemoveById=930240,chain"
     SecRule ARGS_NAMES "@streq wpmudev-hub"
