@@ -70,7 +70,7 @@ WHM → Service Configuration → Apache Configuration → **Include Editor** �
 # 1) Para requests a //.well-known/acme-challenge/<token> (solo letras, números, _ y -),
 #    desactiva ModSecurity SOLO en esa request.
 SecRule REQUEST_URI "@rx ^/\.well-known/acme-challenge/[-_A-Za-z0-9]{20,}$" \
-    "id:9005001,phase:1,pass,nolog,ctl:ruleEngine=Off"
+    "id:9006001,phase:1,pass,nolog,ctl:ruleEngine=Off"
 
 # 2) Para cualquier otra cosa dentro de esa carpeta que NO sea GET/HEAD, bloquear.
 SecRule REQUEST_URI "@rx ^/\.well-known/acme-challenge(/|$)" \
