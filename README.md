@@ -83,10 +83,10 @@ SecRule REQUEST_URI "@rx ^/sapp-wp-signon\.php(?:$|\?)" \
 "id:109014,phase:1,pass,nolog,ctl:ruleRemoveById=930201,ctl:ruleRemoveById=930240"
 
 <IfModule mod_security2.c>
-  # Excepción SOLO para WPMU DEV Hub (Snapshot/Hub) en /wp-load.php
+  # Excepción SOLO para llamadas del Hub de WPMU DEV: /wp-load.php?wpmudev-hub=...
   SecRule REQUEST_URI "@rx ^/wp-load\.php(?:$|\?)" \
     "id:1000003,phase:1,pass,nolog,ctl:ruleRemoveById=930201,ctl:ruleRemoveById=930240,chain"
-  SecRule ARGS_NAMES "@streq wpmudev-hub"
+  SecRule QUERY_STRING "(^|[&?])wpmudev-hub=" "t:none"
 </IfModule>
 
 # 930201 — Bloquear ejecución directa de PHP fuera del core de WP
