@@ -82,6 +82,13 @@ SecRule REQUEST_URI "@rx ^/\.well-known/acme-challenge(/|$)" \
 SecRule REQUEST_URI "@rx ^/sapp-wp-signon\.php(?:$|\?)" \
 "id:109014,phase:1,pass,nolog,ctl:ruleRemoveById=930201,ctl:ruleRemoveById=930240"
 
+<IfModule mod_security2.c>
+  # Excepción SOLO para WPMU DEV Hub (Snapshot/Hub) en /wp-load.php
+  SecRule REQUEST_URI "@rx ^/wp-load\.php(?:$|\?)" \
+    "id:1000003,phase:1,pass,nolog,ctl:ruleRemoveById=930201,ctl:ruleRemoveById=930240,chain"
+  SecRule ARGS_NAMES "@streq wpmudev-hub"
+</IfModule>
+
 # 930201 — Bloquear ejecución directa de PHP fuera del core de WP
 SecRule REQUEST_URI "@rx \.ph(p[0-9]?|tml|ps|ar)(?:$|\?)" \
 "id:930201,phase:1,deny,status:403,log,msg:'Direct PHP no permitido (whitelist WP)',chain"
